@@ -1,0 +1,6 @@
+CREATE TABLE links (
+  code TEXT PRIMARY KEY,
+  url TEXT NOT NULL,
+  clicks BIGINT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT NOW()
+);
