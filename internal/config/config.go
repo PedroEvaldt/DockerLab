@@ -26,7 +26,7 @@ func Load() (*Config, error) {
 		DBHost:        getEnvDefault("DB_HOST", ""),
 		DBPort:        getEnvDefault("DB_PORT", "5432"),
 		DBUser:        getEnvDefault("DB_USER", "postgres"),
-		DBName:        getEnvDefault("DB_NAME", "link"),
+		DBName:        getEnvDefault("DB_NAME", "links"),
 		RedisAddr:     getEnvDefault("REDIS_ADDR", "localhost:6379"),
 		PublicBaseURL: getEnvDefault("PUBLIC_BASE_URL", "http://localhost:8080"),
 	}
