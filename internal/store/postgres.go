@@ -19,7 +19,7 @@ func NewPostgresStore(ctx context.Context, cfg config.Config) (*PostgresStore, e
 	dns := fmt.Sprintf("postgres://%s:postgres@%s:%s/%s?sslmode=disable", cfg.DBUser, cfg.DBHost, cfg.DBPort, cfg.DBName)
 	pool, err := pgxpool.New(ctx, dns)
 	if err != nil {
-		return nil, ErrNotFound
+		return nil, err
 	}
 	err = pool.Ping(ctx)
 	if err != nil {

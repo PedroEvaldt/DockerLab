@@ -14,11 +14,14 @@ type RedisStore struct {
 	client *redis.Client
 }
 
-func NewRedisStore(cfg config.Config) *RedisStore {
+func NewRedisStore(ctx context.Context, cfg config.Config) (*RedisStore, error) {
 	client := redis.NewClient(&redis.Options{Addr: cfg.RedisAddr})
+	if err := client.Ping(ctx).Err(); err != nil {
+		return nil, err
+	}
 	return &RedisStore{
 		client: client,
-	}
+	}, nil
 }
 
 func (r *RedisStore) IncrementClick(ctx context.Context, code string) error {
@@ -55,7 +58,7 @@ func (r *RedisStore) DrainClicks(ctx context.Context) (map[string]int64, error) 
 		for _, key := range keys {
 			val, err := r.client.GetDel(ctx, key).Int64()
 			if errors.Is(err, redis.Nil) {
-				return nil, nil
+				continue
 			}
 			if err != nil {
 				return nil, err
