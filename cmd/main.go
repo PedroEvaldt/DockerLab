@@ -13,6 +13,7 @@ import (
 	"github.com/PedroEvaldt/shortener/internal/config"
 	"github.com/PedroEvaldt/shortener/internal/httpapi"
 	"github.com/PedroEvaldt/shortener/internal/store"
+	"github.com/PedroEvaldt/shortener/internal/worker"
 )
 
 func main() {
@@ -45,12 +46,12 @@ func run() error {
 	defer stop()
 
 	if len(os.Args) > 1 && os.Args[1] == "worker" {
-		return runWorker(ctxApi, cfg, pg, rc)
+		return runWorker(ctxApi, pg, rc)
 	}
 	return runAPI(ctxApi, cfg, pg, rc)
 }
 
-func runAPI(ctx context.Context, cfg *config.Config, pg *store.PostgresStore, rc *store.RedisStore) {
+func runAPI(ctx context.Context, cfg *config.Config, pg *store.PostgresStore, rc *store.RedisStore) error {
 	apiServer := httpapi.New(pg, rc, cfg.PublicBaseURL, slog.Default())
 	srv := &http.Server{
 		Addr:              ":" + cfg.AppPort,
@@ -59,9 +60,12 @@ func runAPI(ctx context.Context, cfg *config.Config, pg *store.PostgresStore, rc
 	}
 	go srv.ListenAndServe()
 	<-ctx.Done()
-	srv.Shutdown(ctx)
+	if err := srv.Shutdown(ctx); err != nil {
+		return fmt.Errorf("failed to shutdown server: %w", err)
+	}
+	return nil
 }
 
-func runWorker(ctx context.Context, cfg *config.Config, pg *store.PostgresStore, rc *store.RedisStore) {
-	fmt.Printf("oi")
+func runWorker(ctx context.Context, pg *store.PostgresStore, rc *store.RedisStore) error {
+	return worker.Run(ctx, pg, rc, 30*time.Second)
 }

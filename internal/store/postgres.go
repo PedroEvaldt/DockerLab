@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/PedroEvaldt/shortener/internal/config"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -42,6 +43,9 @@ func (ps *PostgresStore) SaveLink(ctx context.Context, code, url string) error {
 func (ps *PostgresStore) GetLink(ctx context.Context, code string) (url string, clicks int64, err error) {
 	sql := "SELECT url, clicks FROM links WHERE code = $1;"
 	err = ps.pool.QueryRow(ctx, sql, code).Scan(&url, &clicks)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", 0, ErrNotFound
+	}
 	if err != nil {
 		return "", 0, err
 	}
