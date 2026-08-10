@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Encurtador — painel de testes</title>
+  <style>
+    :root {
+      --bg: #0f172a; --card: #1e293b; --line: #334155;
+      --fg: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8; --accent-fg: #0f172a;
+      --ok: #4ade80; --err: #f87171;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: system-ui, sans-serif; background: var(--bg);
+      color: var(--fg); line-height: 1.5; padding: 2rem 1rem;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; }
+    header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+    h1 { font-size: 1.4rem; margin: 0; }
+    h2 { font-size: 1rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin: 0 0 .75rem; }
+    .badge { font-size: .8rem; padding: .25rem .6rem; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+    .badge.ok { color: var(--ok); border-color: var(--ok); }
+    .badge.err { color: var(--err); border-color: var(--err); }
+    section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem; }
+    .row { display: flex; gap: .5rem; }
+    input {
+      flex: 1; background: var(--bg); border: 1px solid var(--line); color: var(--fg);
+      padding: .6rem .75rem; border-radius: 8px; font-size: .95rem;
+    }
+    input:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
+    button {
+      background: var(--accent); color: var(--accent-fg); border: none; cursor: pointer;
+      padding: .6rem 1rem; border-radius: 8px; font-size: .9rem; font-weight: 600; white-space: nowrap;
+    }
+    button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+    button:hover { opacity: .9; }
+    .msg { font-size: .85rem; margin-top: .6rem; min-height: 1.2rem; }
+    .msg.err { color: var(--err); }
+    .card { border: 1px solid var(--line); border-radius: 8px; padding: .85rem; margin-top: .75rem; }
+    .card a { color: var(--accent); word-break: break-all; }
+    .card .meta { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin-top: .6rem; }
+    .clicks { font-weight: 700; font-size: 1.1rem; }
+    .sub { color: var(--muted); font-size: .8rem; word-break: break-all; }
+    .empty { color: var(--muted); font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>🔗 Encurtador — painel de testes</h1>
+      <span id="health" class="badge">verificando…</span>
+    </header>
+
+    <section>
+      <h2>Encurtar URL</h2>
+      <form id="shortenForm" class="row">
+        <input id="urlInput" type="text" placeholder="https://exemplo.com/pagina-bem-longa" autocomplete="off" required>
+        <button type="submit">Encurtar</button>
+      </form>
+      <div id="shortenMsg" class="msg"></div>
+    </section>
+
+    <section>
+      <h2>Links criados nesta sessão</h2>
+      <div id="links"><p class="empty">Nenhum ainda. Encurte uma URL acima.</p></div>
+    </section>
+
+    <section>
+      <h2>Consultar stats por código</h2>
+      <form id="statsForm" class="row">
+        <input id="codeInput" type="text" placeholder="ex: i8gh8kF" autocomplete="off" required>
+        <button type="submit" class="ghost">Ver stats</button>
+      </form>
+      <div id="statsMsg" class="msg"></div>
+    </section>
+  </div>
+
+  <script>
+    const created = [];
+
+    async function checkHealth() {
+      const el = document.getElementById('health');
+      try {
+        const r = await fetch('/healthz');
+        const body = await r.json();
+        if (r.ok) { el.textContent = 'online'; el.className = 'badge ok'; }
+        else { el.textContent = `pg:${body.postgres} redis:${body.redis}`; el.className = 'badge err'; }
+      } catch {
+        el.textContent = 'offline'; el.className = 'badge err';
+      }
+    }
+
+    document.getElementById('shortenForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = document.getElementById('urlInput');
+      const msg = document.getElementById('shortenMsg');
+      msg.className = 'msg'; msg.textContent = 'encurtando…';
+      try {
+        const r = await fetch('/api/shorten', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: input.value.trim() }),
+        });
+        const body = await r.json();
+        if (!r.ok) { msg.className = 'msg err'; msg.textContent = `erro ${r.status}: ${body.error || 'falhou'}`; return; }
+        msg.textContent = '';
+        created.unshift({ code: body.code, shortURL: body.short_url, original: input.value.trim(), clicks: null });
+        input.value = '';
+        renderLinks();
+      } catch (err) {
+        msg.className = 'msg err'; msg.textContent = 'erro de rede: ' + err.message;
+      }
+    });
+
+    document.getElementById('statsForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const code = document.getElementById('codeInput').value.trim();
+      const msg = document.getElementById('statsMsg');
+      msg.className = 'msg'; msg.textContent = 'consultando…';
+      const data = await fetchStats(code);
+      if (!data) { msg.className = 'msg err'; msg.textContent = `código "${code}" não encontrado (404)`; return; }
+      msg.textContent = `${data.url} — ${data.clicks} clique(s)`;
+    });
+
+    async function fetchStats(code) {
+      const r = await fetch('/api/stats/' + encodeURIComponent(code));
+      if (!r.ok) return null;
+      return r.json();
+    }
+
+    // Dispara o redirect sem sair da página: o servidor conta o clique no Redis.
+    async function simulateClick(code) {
+      await fetch('/' + encodeURIComponent(code), { redirect: 'manual' });
+    }
+
+    function renderLinks() {
+      const box = document.getElementById('links');
+      if (created.length === 0) { box.innerHTML = '<p class="empty">Nenhum ainda. Encurte uma URL acima.</p>'; return; }
+      box.innerHTML = '';
+      created.forEach((item, i) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <a href="${item.shortURL}" target="_blank" rel="noopener">${item.shortURL}</a>
+          <div class="sub">→ ${item.original}</div>
+          <div class="meta">
+            <span class="clicks" data-clicks="${i}">${item.clicks === null ? '—' : item.clicks} cliques</span>
+            <button class="ghost" data-act="click" data-i="${i}">Simular clique</button>
+            <button class="ghost" data-act="refresh" data-i="${i}">Atualizar cliques</button>
+            <button class="ghost" data-act="copy" data-i="${i}">Copiar</button>
+          </div>`;
+        box.appendChild(card);
+      });
+    }
+
+    document.getElementById('links').addEventListener('click', async (e) => {
+      const btn = e.target.closest('button'); if (!btn) return;
+      const i = Number(btn.dataset.i); const item = created[i];
+      if (btn.dataset.act === 'copy') {
+        await navigator.clipboard.writeText(item.shortURL);
+        btn.textContent = 'Copiado!'; setTimeout(() => btn.textContent = 'Copiar', 1200);
+        return;
+      }
+      if (btn.dataset.act === 'click') { await simulateClick(item.code); }
+      const data = await fetchStats(item.code);
+      if (data) {
+        item.clicks = data.clicks;
+        document.querySelector(`[data-clicks="${i}"]`).textContent = data.clicks + ' cliques';
+      }
+    });
+
+    checkHealth();
+    setInterval(checkHealth, 5000);
+  </script>
+</body>
+</html>

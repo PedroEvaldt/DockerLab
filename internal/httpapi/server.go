@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -10,6 +11,9 @@ import (
 	"github.com/PedroEvaldt/shortener/internal/shortener"
 	"github.com/PedroEvaldt/shortener/internal/store"
 )
+
+//go:embed index.html
+var indexHTML []byte
 
 type Server struct {
 	pg      *store.PostgresStore
@@ -50,11 +54,17 @@ func New(pg *store.PostgresStore, rc *store.RedisStore, baseURL string, logger *
 
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /{$}", s.handleIndex)
 	mux.HandleFunc("POST /api/shorten", s.handleShorten)
 	mux.HandleFunc("GET /api/stats/{code}", s.handleStats)
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 	mux.HandleFunc("GET /{code}", s.handleRedirect)
 	return mux
+}
+
+func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write(indexHTML)
 }
 
 func (s *Server) handleShorten(w http.ResponseWriter, r *http.Request) {
