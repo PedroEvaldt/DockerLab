@@ -17,7 +17,7 @@ type PostgresStore struct {
 }
 
 func NewPostgresStore(ctx context.Context, cfg config.Config) (*PostgresStore, error) {
-	dns := fmt.Sprintf("postgres://%s:postgres@%s:%s/%s?sslmode=disable", cfg.DBUser, cfg.DBHost, cfg.DBPort, cfg.DBName)
+	dns := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", cfg.DBUser, cfg.DBPassword, cfg.DBHost, cfg.DBPort, cfg.DBName)
 	pool, err := pgxpool.New(ctx, dns)
 	if err != nil {
 		return nil, err
