@@ -45,6 +45,7 @@ services:
       start_period: 5s
   api:
     build: .
+    image: shortener:local
     environment:
       APP_PORT: 8080
       DB_HOST: postgres
@@ -65,7 +66,26 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
-
+  worker:
+    image: shortener:local
+    command: ["worker"]
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_NAME: link
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      REDIS_ADDR: redis:6379
+    secrets:
+      - db_password
+    networks:
+      - backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
 volumes:
   pg_data:
 
